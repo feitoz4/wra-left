@@ -1706,25 +1706,54 @@ footer{padding:46px 0 40px;border-top:1px solid var(--fio)}
     });
 
   function mostrar(el){ el.classList.add('vista'); }
-  function varrer(){
-    if (!fila.length) return;
-    var h = innerHeight || 800;
-    fila = fila.filter(function(el){
-      var r = el.getBoundingClientRect();
-      if (r.top < h * 0.88 && r.bottom > 0){ mostrar(el); return false; }
-      return true;
-    });
+
+  if (window.IntersectionObserver){
+    /* O observador é o caminho principal, e não precisa de muleta: ele avisa
+       quando o elemento entra na tela, sem depender de ouvinte de rolagem.
+
+       Aqui havia uma rede de segurança que revelava TUDO depois de 3s. A
+       intenção era boa — conteúdo nunca preso —, mas o efeito colateral
+       matava o recurso: bastava olhar a capa por três segundos, o que é o
+       normal com um vídeo tocando, para a página inteira já estar revelada
+       quando se chegava nela. Ninguém via entrada nenhuma. */
+    var obs = new IntersectionObserver(function(entradas){
+      entradas.forEach(function(e){
+        /* `isIntersecting` falso vale para dois casos opostos: o elemento
+           ainda não chegou, ou já passou por cima. Num salto grande de
+           rolagem ele pode ir de um ao outro entre dois quadros e nunca ser
+           reportado dentro da tela — e ficaria escondido para sempre atrás
+           do leitor. Por isso revelo também o que já ficou acima. */
+        if (!e.isIntersecting && e.boundingClientRect.top > 0) return;
+        mostrar(e.target);
+        obs.unobserve(e.target);     // entrou uma vez, não precisa vigiar mais
+      });
+    }, {rootMargin:'0px 0px -12% 0px'});   // pede 12% de entrada, como antes
+    fila.forEach(function(el){ obs.observe(el); });
+
+  } else {
+    /* Sem observador, volta a rolagem — e aí a rede por tempo faz sentido,
+       porque este caminho é mesmo frágil. Oito segundos, não três: tempo de
+       sobra para alguém sair da capa por conta própria. */
+    var varrer = function(){
+      if (!fila.length) return;
+      var h = innerHeight || 800;
+      fila = fila.filter(function(el){
+        var r = el.getBoundingClientRect();
+        if (r.top < h * 0.88 && r.bottom > 0){ mostrar(el); return false; }
+        return true;
+      });
+    };
+    var aguarda = false;
+    addEventListener('scroll', function(){
+      if (aguarda) return;
+      aguarda = true;
+      requestAnimationFrame(function(){ aguarda = false; varrer(); });
+    }, {passive:true});
+    addEventListener('resize', varrer);
+    addEventListener('load', varrer);
+    varrer();
+    setTimeout(function(){ fila.forEach(mostrar); fila = []; }, 8000);
   }
-  var aguarda = false;
-  addEventListener('scroll', function(){
-    if (aguarda) return;
-    aguarda = true;
-    requestAnimationFrame(function(){ aguarda = false; varrer(); });
-  }, {passive:true});
-  addEventListener('resize', varrer);
-  addEventListener('load', varrer);
-  varrer();
-  setTimeout(function(){ fila.forEach(mostrar); fila = []; }, 3000);
 })();
 </script>
 </body>
