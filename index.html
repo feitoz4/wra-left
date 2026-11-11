@@ -358,6 +358,23 @@ p a{
      diferença são 60px de altura no bloco. Encurtar o recheio resolve a
      inconsistência e é o que mais libera vídeo em cima. */
   .capa__acoes .bt{padding:0 18px}
+
+  /* ---- os corpos da capa acompanham a ALTURA da tela ----
+     O título estava travado em 43,2px em qualquer celular: o clamp dele usa
+     `vw`, e nessas larguras o valor fica sempre abaixo do mínimo. Como o
+     resto também era fixo, o bloco media os mesmos ~410px num Pro Max e num
+     SE — ocupando 46% da capa no primeiro e 69% no segundo. Medindo em svh,
+     a mesma proporção vale para telas baixas. Os mínimos existem para o
+     texto não virar ilegível num aparelho muito pequeno. */
+  .capa .rotulo{font-size:clamp(10px,1.23svh,11.5px)}
+  .capa .titulo{font-size:clamp(31px,4.63svh,43px);margin-top:clamp(12px,2.36svh,22px)}
+  .capa .linha-banho{margin-top:clamp(10px,1.93svh,18px)}
+  .capa__texto > p:not(.rotulo){
+    font-size:clamp(13.5px,1.72svh,16px);margin-top:clamp(10px,1.93svh,18px);
+  }
+  .capa__acoes{margin-top:clamp(18px,3.65svh,34px)}
+  .capa__acoes .bt{height:clamp(42px,5.36svh,50px);font-size:clamp(10px,1.18svh,11px)}
+  .capa .capa__play{margin-top:clamp(12px,2.36svh,22px);font-size:clamp(10px,1.23svh,11.5px)}
 }
 
 /* ---- cores da capa sobre a mídia ----
