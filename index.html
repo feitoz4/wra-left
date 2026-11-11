@@ -331,25 +331,33 @@ p a{
   .capa__img,.capa__texto{grid-area:1/1}
   .capa__img{align-self:stretch;height:100%;width:100%}
   .capa__img img{object-position:center 26%}
-  /* Véu sob o texto. Sem ele o texto claro desaparece nos trechos claros da
-     imagem — pele e fundo. Ele fica preso ao BLOCO DE TEXTO, não à altura da
-     capa: numa tela de 640px o texto começa a 12% da capa, e um véu medido em
+  /* Véu sob o texto, preso ao BLOCO DE TEXTO e não à altura da capa: numa
+     tela de 640px o texto começa a 12% da capa, e um véu medido em
      porcentagem da capa ainda estaria aberto ali (o rótulo caía a 1,48:1).
      Ancorado assim, a esmaecida acontece nos 90px acima do texto e daí para
      baixo o véu nunca é menor que 0,86 — sobre o pior caso possível, um
-     trecho branco da foto, isso dá 6,4:1 no Ecru e 10,6:1 no Cultured.
-     Acima desses 90px a foto fica limpa: é onde estão o rosto e as peças. */
+     quadro branco, isso dá 6,4:1 no Ecru e 10,6:1 no Cultured. Acima desses
+     90px a imagem fica limpa. */
   .capa__texto::before{
     content:'';position:absolute;left:0;right:0;bottom:0;top:-90px;
     z-index:-1;pointer-events:none;
     background:linear-gradient(180deg,
       rgba(37,20,10,0) 0, rgba(37,20,10,.86) 90px, rgba(37,20,10,.94) 100%);
   }
+  /* Texto apoiado embaixo, não centrado. Cheguei a centralizar achando que o
+     vão de vídeo acima era o defeito; não era — é o desenho pedido. */
   .capa__texto{
     position:relative;z-index:1;align-self:end;
-    padding:0 var(--gut) clamp(38px,7vh,64px);
+    /* Respiro menor embaixo: empurra o bloco para baixo e abre mais vídeo. */
+    padding:0 var(--gut) clamp(24px,4vh,42px);
     max-width:none;justify-self:stretch;
   }
+  /* Os dois botões ficavam a 8px de não caber lado a lado — 364px de botão
+     mais 10 de respiro contra 366 disponíveis numa tela de 406px. Conforme a
+     fonte que carrega, um aparelho mostra em uma linha e outro em duas, e a
+     diferença são 60px de altura no bloco. Encurtar o recheio resolve a
+     inconsistência e é o que mais libera vídeo em cima. */
+  .capa__acoes .bt{padding:0 18px}
 }
 
 /* ---- cores da capa sobre a mídia ----
@@ -883,7 +891,8 @@ footer{padding:46px 0 40px;border-top:1px solid var(--fio)}
          aparelho — 25 KB jogados fora no celular, onde o vídeo nem carrega. -->
     <video class="capa__video" id="capaVideo" aria-hidden="true"
            muted loop playsinline preload="none"
-           data-src="video-oficina.mp4"></video>
+           data-src="video-oficina.mp4"
+           data-src-movel="video-oficina-movel.mp4"></video>
   </figure>
 </section>
 
@@ -1337,21 +1346,28 @@ footer{padding:46px 0 40px;border-top:1px solid var(--fio)}
 
   /* ---- vídeo da capa ----
      Decido aqui, e não no CSS, porque esconder por CSS não evita o download.
-     Três condições para carregar: tela larga (no retrato do celular o corte
-     deixaria um quarto da largura do quadro e o texto fica por cima),
-     movimento permitido, e conexão que não peça economia. */
+
+     O celular tinha ficado de fora por dois motivos: o corte vertical
+     aproveitaria só 25% da largura do quadro, e eram 2,9 MB de dados móveis.
+     Os dois foram resolvidos com um arquivo próprio, recortado em retrato
+     direto do master — mesmo enquadramento, 1,2 MB. Agora só não carrega
+     quem pediu menos movimento ou economia de dados. */
   var vid = document.getElementById('capaVideo');
   if (vid){
     var con = navigator.connection || {};
     var carregar =
-      matchMedia('(min-width:901px)').matches &&
       !matchMedia('(prefers-reduced-motion:reduce)').matches &&
       con.saveData !== true &&
       !/(^|-)2g$/.test(con.effectiveType || '');
 
     if (carregar){
       vid.addEventListener('playing', function(){ vid.classList.add('tocando'); });
-      vid.src = vid.getAttribute('data-src');
+      /* A escolha é feita uma vez, no carregamento. Trocar de arquivo ao
+         girar o aparelho significaria baixar o segundo por cima do primeiro,
+         que é justamente o que se quer evitar numa rede móvel. */
+      var movel = vid.getAttribute('data-src-movel');
+      vid.src = (movel && matchMedia('(max-width:900px)').matches)
+                  ? movel : vid.getAttribute('data-src');
       var tocar = vid.play();
       /* Reprodução automática pode ser recusada mesmo com o vídeo mudo. Não é
          erro: a foto fica no lugar e a página segue igual. */
@@ -1707,53 +1723,35 @@ footer{padding:46px 0 40px;border-top:1px solid var(--fio)}
 
   function mostrar(el){ el.classList.add('vista'); }
 
-  if (window.IntersectionObserver){
-    /* O observador é o caminho principal, e não precisa de muleta: ele avisa
-       quando o elemento entra na tela, sem depender de ouvinte de rolagem.
+  /* Varredura na rolagem, e não IntersectionObserver. O observador só avisa
+     quando a interseção CRUZA o limiar: num salto grande — âncora do menu,
+     barra de rolagem arrastada, Ctrl+End — o elemento vai de "ainda não
+     chegou" a "já passou" sem nunca intersectar, e o aviso não vem. Medi:
+     com saltos de 700px, 13 dos 28 ficavam escondidos para sempre. A
+     varredura recalcula a posição a cada quadro e não tem esse furo.
 
-       Aqui havia uma rede de segurança que revelava TUDO depois de 3s. A
-       intenção era boa — conteúdo nunca preso —, mas o efeito colateral
-       matava o recurso: bastava olhar a capa por três segundos, o que é o
-       normal com um vídeo tocando, para a página inteira já estar revelada
-       quando se chegava nela. Ninguém via entrada nenhuma. */
-    var obs = new IntersectionObserver(function(entradas){
-      entradas.forEach(function(e){
-        /* `isIntersecting` falso vale para dois casos opostos: o elemento
-           ainda não chegou, ou já passou por cima. Num salto grande de
-           rolagem ele pode ir de um ao outro entre dois quadros e nunca ser
-           reportado dentro da tela — e ficaria escondido para sempre atrás
-           do leitor. Por isso revelo também o que já ficou acima. */
-        if (!e.isIntersecting && e.boundingClientRect.top > 0) return;
-        mostrar(e.target);
-        obs.unobserve(e.target);     // entrou uma vez, não precisa vigiar mais
-      });
-    }, {rootMargin:'0px 0px -12% 0px'});   // pede 12% de entrada, como antes
-    fila.forEach(function(el){ obs.observe(el); });
-
-  } else {
-    /* Sem observador, volta a rolagem — e aí a rede por tempo faz sentido,
-       porque este caminho é mesmo frágil. Oito segundos, não três: tempo de
-       sobra para alguém sair da capa por conta própria. */
-    var varrer = function(){
-      if (!fila.length) return;
-      var h = innerHeight || 800;
-      fila = fila.filter(function(el){
-        var r = el.getBoundingClientRect();
-        if (r.top < h * 0.88 && r.bottom > 0){ mostrar(el); return false; }
-        return true;
-      });
-    };
-    var aguarda = false;
-    addEventListener('scroll', function(){
-      if (aguarda) return;
-      aguarda = true;
-      requestAnimationFrame(function(){ aguarda = false; varrer(); });
-    }, {passive:true});
-    addEventListener('resize', varrer);
-    addEventListener('load', varrer);
-    varrer();
-    setTimeout(function(){ fila.forEach(mostrar); fila = []; }, 8000);
+     Também não há mais rede por tempo. A anterior revelava tudo após 3s, e
+     como a capa tem vídeo tocando, três segundos parado nela é o normal: a
+     página inteira já chegava revelada e o efeito nunca aparecia. */
+  function varrer(){
+    if (!fila.length) return;
+    var h = innerHeight || 800;
+    fila = fila.filter(function(el){
+      /* Sem conferir a borda de baixo: o que já subiu para fora da tela
+         também precisa ser revelado, senão fica preso atrás do leitor. */
+      if (el.getBoundingClientRect().top < h * 0.88){ mostrar(el); return false; }
+      return true;
+    });
   }
+  var aguarda = false;
+  addEventListener('scroll', function(){
+    if (aguarda) return;
+    aguarda = true;
+    requestAnimationFrame(function(){ aguarda = false; varrer(); });
+  }, {passive:true});
+  addEventListener('resize', varrer);
+  addEventListener('load', varrer);
+  varrer();
 })();
 </script>
 </body>
